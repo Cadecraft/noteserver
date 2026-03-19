@@ -50,6 +50,9 @@ struct NoteMetadata {
 struct NoteContents {
     md_contents: String,
 }
+struct DirectoryMetadata {
+    description: Option<String>,
+}
 
 // TODO: move constant to rendering folder and add og
 const ERROR_PAGE: &str = r#"
@@ -63,6 +66,27 @@ const ERROR_PAGE: &str = r#"
 "#;
 
 pub async fn get_dir(pool: &sqlx::PgPool, dir: String) -> Html<String> {
+    let dir_data = match sqlx::query_as!(
+        DirectoryMetadata,
+        r#"
+        SELECT description
+        FROM directory
+        WHERE id = $1
+    "#,
+        dir,
+    )
+    .fetch_all(pool)
+    .await
+    {
+        // TODO: refactor this to "or error page"
+        Ok(rows) => rows,
+        Err(_) => return Html(ERROR_PAGE.to_string()),
+    };
+
+    if dir_data.is_empty() {
+        return Html(ERROR_PAGE.to_string());
+    }
+
     let notes = match sqlx::query_as!(
         NoteMetadata,
         r#"
@@ -89,20 +113,25 @@ pub async fn get_dir(pool: &sqlx::PgPool, dir: String) -> Html<String> {
         .map(|n| format!("<li>{}</li>", n))
         .collect::<String>();
 
+    let dir_descr_elem = match &dir_data[0].description {
+        Some(d) => format!("<p>{}</p>", d),
+        None => String::new(),
+    };
+
     let dir_template = format!(
         r#"
 <!DOCTYPE html>
 <html>
 <body>
     <h1>Notes directory: {}</h1>
-    <p>Notes include:</p>
+    {}
     <ul>
     {}
     </ul>
 </body>
 </html> 
 "#,
-        dir, note_list
+        dir, dir_descr_elem, note_list
     );
 
     Html(dir_template)
@@ -114,9 +143,10 @@ pub async fn get_note(pool: &sqlx::PgPool, dir: String, note: String) -> Html<St
         r#"
         SELECT md_contents
         FROM note
-        WHERE (directory_id = $1);
+        WHERE directory_id = $1 AND id = $2;
     "#,
-        dir
+        dir,
+        note,
     )
     .fetch_one(pool)
     .await
