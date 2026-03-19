@@ -12,7 +12,8 @@ pub async fn setup_schemas(pool: &Pool<Postgres>) {
         r#"
         CREATE TABLE IF NOT EXISTS directory(
             id TEXT PRIMARY KEY,
-            description TEXT
+            description TEXT,
+            protected BOOLEAN
         );
         "#,
     )
@@ -33,6 +34,19 @@ pub async fn setup_schemas(pool: &Pool<Postgres>) {
     .execute(&mut *transaction)
     .await
     .expect("Failed to create note table");
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS token(
+            tok TEXT PRIMARY KEY,
+            created DATE NOT NULL,
+            unlocks_directory_id TEXT references directory(id)
+        );
+        "#,
+    )
+    .execute(&mut *transaction)
+    .await
+    .expect("Failed to create token table");
 
     transaction.commit().await.unwrap();
 }

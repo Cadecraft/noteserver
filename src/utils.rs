@@ -1,5 +1,5 @@
 use axum::http::StatusCode;
-use axum::response::{Html, Response, IntoResponse};
+use axum::response::{Html, IntoResponse, Response};
 
 use crate::rendering;
 

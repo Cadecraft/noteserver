@@ -70,7 +70,8 @@ hr {
 "#;
 
 fn front_matter(title: &str) -> String {
-    format!(r#"
+    format!(
+        r#"
 <head>
 <title>{}</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora">
@@ -78,11 +79,14 @@ fn front_matter(title: &str) -> String {
 {}
 </style>
 </head>
-"#, title, STYLE_RULES)
+"#,
+        title, STYLE_RULES
+    )
 }
 
 pub fn error_page(error: &str) -> String {
-    format!(r#"
+    format!(
+        r#"
 <!DOCTYPE html>
 <html>
 {}
@@ -93,12 +97,15 @@ pub fn error_page(error: &str) -> String {
     </div>
 </body>
 </html>
-"#, front_matter("Notes"), error)
+"#,
+        front_matter("Notes"),
+        error
+    )
 }
 
 const MISC_DIR_ID: &str = "misc";
 
-pub fn directory(dir: &str, note_titles: &Vec<String>, description: &Option<String>) -> String {
+pub fn directory(dir: &str, note_titles: &[String], description: &Option<String>) -> String {
     let dir_descr_elem = match description {
         Some(d) => format!("<p>{}</p>", d),
         None => String::new(),
@@ -121,7 +128,9 @@ pub fn directory(dir: &str, note_titles: &Vec<String>, description: &Option<Stri
 </body>
 </html>
 "#,
-            front_matter(dir), dir, dir_descr_elem
+            front_matter(dir),
+            dir,
+            dir_descr_elem
         );
     }
 
@@ -146,18 +155,25 @@ pub fn directory(dir: &str, note_titles: &Vec<String>, description: &Option<Stri
 </body>
 </html>
 "#,
-        front_matter(dir), dir, dir_descr_elem, note_list
+        front_matter(dir),
+        dir,
+        dir_descr_elem,
+        note_list
     )
 }
 
 pub fn note(dir: &str, note: &str, md_contents: &str) -> String {
-    let md_as_html = markdown::to_html_with_options(md_contents, &markdown::Options::gfm()).unwrap();
+    let md_as_html =
+        markdown::to_html_with_options(md_contents, &markdown::Options::gfm()).unwrap();
 
     let note_title = format!("{} ({})", note, dir);
 
     let mut actions: Vec<String> = Vec::new();
     if dir != MISC_DIR_ID {
-        actions.push(format!("<a href=\"/{}\">Return to directory {}</a> • ", dir, dir));
+        actions.push(format!(
+            "<a href=\"/{}\">Return to directory {}</a> • ",
+            dir, dir
+        ));
     }
     actions.push(format!("<a href=\"/{}/{}?raw=true\">Raw</a>", dir, note));
 
@@ -177,6 +193,8 @@ pub fn note(dir: &str, note: &str, md_contents: &str) -> String {
 </body>
 </html>
 "#,
-        front_matter(&note_title), md_as_html, actions_str
+        front_matter(&note_title),
+        md_as_html,
+        actions_str
     )
 }

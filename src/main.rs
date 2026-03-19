@@ -1,6 +1,6 @@
 use axum::{
     Router,
-    extract::{Path, State, Query},
+    extract::{Path, Query, State},
     http::{
         StatusCode,
         header::{self, HeaderMap},
@@ -9,13 +9,13 @@ use axum::{
     routing::{get, post},
 };
 
+use serde::Deserialize;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
-use serde::Deserialize;
 
 mod config;
-mod utils;
 mod rendering;
+mod utils;
 
 use noteserver::auth;
 
@@ -103,7 +103,7 @@ async fn get_dir(Path(dir): Path<String>, State(state): State<Arc<AppState>>) ->
 
 #[derive(Deserialize)]
 struct NoteRaw {
-    raw: Option<bool>
+    raw: Option<bool>,
 }
 
 async fn get_note(
