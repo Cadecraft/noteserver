@@ -184,7 +184,7 @@ pub async fn get_dir(
     let mut note_titles = notes.iter().map(|n| n.id.clone()).collect::<Vec<String>>();
     note_titles.sort();
 
-    let description = &target_dir.description;
+    let description = target_dir.description.as_deref();
     Html(rendering::directory(
         &dir,
         &note_titles,

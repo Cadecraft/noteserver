@@ -89,18 +89,25 @@ hr {
 }
 "#;
 
-fn front_matter(title: &str) -> String {
+fn front_matter(title: &str, descr: Option<&str>) -> String {
+    let descr_elem = match descr {
+        Some(d) => format!("<meta property=\"og:description\" content=\"{}\" />", d),
+        None => String::new(),
+    };
+
     format!(
         r#"
 <head>
 <title>{}</title>
+<meta property="og:title" content="{}" />
+{}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora">
 <style>
 {}
 </style>
 </head>
 "#,
-        title, STYLE_RULES
+        title, title, descr_elem, STYLE_RULES
     )
 }
 
@@ -118,7 +125,7 @@ pub fn error_page(error: &str) -> String {
 </body>
 </html>
 "#,
-        front_matter("Notes"),
+        front_matter("Notes", None),
         error
     )
 }
@@ -141,14 +148,14 @@ pub fn root() -> String {
 </body>
 </html>
 "#,
-        front_matter("Notes")
+        front_matter("Notes", Some("Self-hosted markdown notes"))
     )
 }
 
 pub fn directory(
     dir: &str,
     note_titles: &[String],
-    description: &Option<String>,
+    description: Option<&str>,
     darktheme: bool,
 ) -> String {
     let dir_descr_elem = match description {
@@ -174,7 +181,7 @@ pub fn directory(
 </html>
 "#,
             if darktheme { "dark" } else { "" },
-            front_matter(dir),
+            front_matter(dir, description),
             dir,
             dir_descr_elem
         );
@@ -202,11 +209,20 @@ pub fn directory(
 </html>
 "#,
         if darktheme { "dark" } else { "" },
-        front_matter(dir),
+        front_matter(dir, description),
         dir,
         dir_descr_elem,
         note_list
     )
+}
+
+fn descr_from_contents(md_contents: &str) -> String {
+    let start = md_contents.chars().take(60).filter(|c| c.is_ascii()).collect::<String>();
+    if start.chars().count() < md_contents.chars().count() {
+        start + "..."
+    } else {
+        start
+    }
 }
 
 pub fn note(dir: &str, note: &str, md_contents: &str, darktheme: bool) -> String {
@@ -235,6 +251,8 @@ pub fn note(dir: &str, note: &str, md_contents: &str, darktheme: bool) -> String
 
     let actions_str = actions.iter().map(|o| o.to_string()).collect::<String>();
 
+    let note_descr = descr_from_contents(md_contents);
+
     format!(
         r#"
 <!DOCTYPE html>
@@ -250,7 +268,7 @@ pub fn note(dir: &str, note: &str, md_contents: &str, darktheme: bool) -> String
 </html>
 "#,
         if darktheme { "dark" } else { "" },
-        front_matter(&note_title),
+        front_matter(&note_title, Some(&note_descr)),
         md_as_html,
         actions_str
     )
