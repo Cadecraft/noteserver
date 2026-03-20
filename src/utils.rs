@@ -10,7 +10,7 @@ pub async fn create_dir(pool: &sqlx::PgPool, id: String, description: String, pr
         (id, description, protected)
         VALUES ($1, $2, $3)
         ON CONFLICT (id) DO UPDATE
-        SET description = EXCLUDED.description;
+        SET description = EXCLUDED.description, protected = EXCLUDED.protected;
     "#,
         id,
         description,
@@ -100,13 +100,34 @@ struct NoteContents {
 }
 struct DirectoryMetadata {
     description: Option<String>,
+    protected: Option<bool>,
 }
 
-pub async fn get_dir(pool: &sqlx::PgPool, dir: String) -> Html<String> {
+async fn is_valid_token(pool: &sqlx::PgPool, dir: &str, token: &str) -> bool {
+    let token_info = match sqlx::query!(
+        r#"
+        SELECT FROM token
+        WHERE tok = $1 AND unlocks_directory_id = $2
+    "#,
+        token,
+        dir,
+    )
+    .fetch_all(pool)
+    .await
+    {
+        // TODO: refactor this to "or error page"
+        Ok(rows) => rows,
+        Err(_) => return false,
+    };
+    let token_exists = !token_info.is_empty();
+    token_exists
+}
+
+pub async fn get_dir(pool: &sqlx::PgPool, dir: String, token: Option<String>) -> Html<String> {
     let dir_data = match sqlx::query_as!(
         DirectoryMetadata,
         r#"
-        SELECT description
+        SELECT description, protected
         FROM directory
         WHERE id = $1
     "#,
@@ -121,6 +142,21 @@ pub async fn get_dir(pool: &sqlx::PgPool, dir: String) -> Html<String> {
     };
 
     if dir_data.is_empty() {
+        return Html(rendering::error_page("Directory not found"));
+    }
+
+    let target_dir = &dir_data[0];
+
+    let valid_auth = if target_dir.protected.unwrap_or(false) {
+        match token {
+            Some(tok) => is_valid_token(pool, &dir, &tok).await,
+            None => false
+        }
+    } else {
+        true
+    };
+
+    if !valid_auth {
         return Html(rendering::error_page("Directory not found"));
     }
 
@@ -145,7 +181,7 @@ pub async fn get_dir(pool: &sqlx::PgPool, dir: String) -> Html<String> {
     let mut note_titles = notes.iter().map(|n| n.id.clone()).collect::<Vec<String>>();
     note_titles.sort();
 
-    let description = &dir_data[0].description;
+    let description = &target_dir.description;
     Html(rendering::directory(&dir, &note_titles, description))
 }
 

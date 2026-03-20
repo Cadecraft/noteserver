@@ -78,7 +78,6 @@ struct DirDetails {
     protected: Option<bool>
 }
 
-// TODO: secure routes with auth
 async fn post_dir(
     Query(query): Query<DirDetails>,
     Path(dir): Path<String>,
@@ -93,7 +92,6 @@ async fn post_dir(
     utils::create_dir(&state.db_pool, dir, body, protected).await
 }
 
-// TODO: secure routes with auth
 async fn post_note(
     Path((dir, id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -107,12 +105,12 @@ async fn post_note(
 }
 
 #[derive(Deserialize)]
-struct TokenDetails {
+struct PostTokenQuery {
     directory: String,
 }
 
 async fn post_token(
-    Query(query): Query<TokenDetails>,
+    Query(query): Query<PostTokenQuery>,
     Path(token): Path<String>,
     headers: HeaderMap,
     State(state): State<Arc<AppState>>,
@@ -134,8 +132,18 @@ async fn delete_token(
     utils::delete_token(&state.db_pool, token).await
 }
 
-async fn get_dir(Path(dir): Path<String>, State(state): State<Arc<AppState>>) -> Html<String> {
-    utils::get_dir(&state.db_pool, dir).await
+#[derive(Deserialize)]
+struct GetDirQuery {
+    tok: Option<String>,
+}
+
+async fn get_dir(
+    Query(query): Query<GetDirQuery>,
+    Path(dir): Path<String>,
+    State(state): State<Arc<AppState>>
+) -> Html<String> {
+    // TODO: handle cookie stuff
+    utils::get_dir(&state.db_pool, dir, query.tok).await
 }
 
 #[derive(Deserialize)]
