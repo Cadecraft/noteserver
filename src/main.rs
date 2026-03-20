@@ -159,12 +159,12 @@ async fn get_dir(
     jar: CookieJar,
     State(state): State<Arc<AppState>>,
 ) -> (CookieJar, Html<String>) {
-    let cookie_name = get_token_cookie_name(&dir);
+    let token_cookie_name = get_token_cookie_name(&dir);
     let new_jar = match &query.tok {
-        Some(tok) => jar.add(Cookie::new(cookie_name.clone(), tok.clone())),
+        Some(tok) => jar.add(Cookie::new(token_cookie_name.clone(), tok.clone())),
         None => jar,
     };
-    let tok = get_cookie_from_jar(&new_jar, &cookie_name);
+    let tok = get_cookie_from_jar(&new_jar, &token_cookie_name);
     let use_dark = is_dark_theme(&new_jar);
     (new_jar, utils::get_dir(&state.db_pool, dir, tok, use_dark).await)
 }
@@ -182,12 +182,20 @@ async fn get_note(
     State(state): State<Arc<AppState>>,
 ) -> Response {
     let raw = query.raw.unwrap_or(false);
-    let cookie_name = get_token_cookie_name(&dir);
-    let tok = get_cookie_from_jar(&jar, &cookie_name);
-    let new_jar = match &query.theme {
-        Some(theme) => jar.add(Cookie::new("theme", theme.clone())),
-        None => jar
+    match &query.theme {
+        Some(theme) => {
+            let mut headers = HeaderMap::new();
+            headers.insert(header::LOCATION, format!("/{}/{}", dir, id).parse().unwrap());
+            return (
+                StatusCode::TEMPORARY_REDIRECT,
+                headers,
+                jar.add(Cookie::new("theme", theme.clone())),
+            ).into_response();
+        },
+        None => ()
     };
-    let use_dark = is_dark_theme(&new_jar);
-    (new_jar, utils::get_note(&state.db_pool, dir, id, raw, tok, use_dark).await).into_response()
+    let token_cookie_name = get_token_cookie_name(&dir);
+    let tok = get_cookie_from_jar(&jar, &token_cookie_name);
+    let use_dark = is_dark_theme(&jar);
+    (jar, utils::get_note(&state.db_pool, dir, id, raw, tok, use_dark).await).into_response()
 }
