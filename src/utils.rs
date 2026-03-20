@@ -141,7 +141,21 @@ pub async fn get_dir(
     token: Option<String>,
     darktheme: bool,
 ) -> Html<String> {
-    let target_dir = match get_dir_metadata(pool, &dir).await {
+    let (dir_metadata_res, note_query_res) = tokio::join!(
+        get_dir_metadata(pool, &dir),
+        sqlx::query_as!(
+            NoteMetadata,
+            r#"
+            SELECT id
+            FROM note
+            WHERE directory_id = $1;
+        "#,
+            dir,
+        )
+        .fetch_all(pool)
+    );
+
+    let target_dir = match dir_metadata_res {
         Some(res) => res,
         None => return Html(rendering::error_page("Directory not found")),
     };
@@ -159,23 +173,10 @@ pub async fn get_dir(
         return Html(rendering::error_page("Directory not found"));
     }
 
-    let notes = match sqlx::query_as!(
-        NoteMetadata,
-        r#"
-        SELECT id
-        FROM note
-        WHERE directory_id = $1;
-    "#,
-        dir,
-    )
-    .fetch_all(pool)
-    .await
-    {
+    let notes = match note_query_res {
         Ok(rows) => rows,
         Err(_) => return Html(rendering::error_page("Directory not found")),
     };
-
-    // TODO: also get description from dir table
 
     let mut note_titles = notes.iter().map(|n| n.id.clone()).collect::<Vec<String>>();
     note_titles.sort();
@@ -197,7 +198,22 @@ pub async fn get_note(
     token: Option<String>,
     darktheme: bool,
 ) -> Response {
-    let target_dir = match get_dir_metadata(pool, &dir).await {
+    let (dir_metadata_res, note_query_res) = tokio::join!(
+        get_dir_metadata(pool, &dir),
+        sqlx::query_as!(
+            NoteContents,
+            r#"
+            SELECT md_contents
+            FROM note
+            WHERE directory_id = $1 AND id = $2;
+        "#,
+            dir,
+            note,
+        )
+        .fetch_one(pool)
+    );
+
+    let target_dir = match dir_metadata_res {
         Some(res) => res,
         None => return Html(rendering::error_page("Note not found")).into_response(),
     };
@@ -215,19 +231,7 @@ pub async fn get_note(
         return Html(rendering::error_page("Note not found")).into_response();
     }
 
-    let note_contents = match sqlx::query_as!(
-        NoteContents,
-        r#"
-        SELECT md_contents
-        FROM note
-        WHERE directory_id = $1 AND id = $2;
-    "#,
-        dir,
-        note,
-    )
-    .fetch_one(pool)
-    .await
-    {
+    let note_contents = match note_query_res {
         Ok(rows) => rows,
         Err(_) => return Html(rendering::error_page("Note not found")).into_response(),
     };
