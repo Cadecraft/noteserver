@@ -5,7 +5,7 @@ use axum::{
         StatusCode,
         header::{self, HeaderMap},
     },
-    response::{Html, Response},
+    response::{Html, IntoResponse, Response},
     routing::{delete, get, post},
 };
 
@@ -134,13 +134,18 @@ async fn delete_token(
     utils::delete_token(&state.db_pool, token).await
 }
 
-fn get_token_from_jar(jar: &CookieJar, cookie_name: &str) -> Option<String> {
+fn get_cookie_from_jar(jar: &CookieJar, cookie_name: &str) -> Option<String> {
     let cookie_gotten = jar.get(cookie_name).cloned();
     cookie_gotten.map(|cookie| cookie.value().to_string())
 }
 
-fn get_cookie_name(dir: &str) -> String {
+fn get_token_cookie_name(dir: &str) -> String {
     format!("tok-{}", dir)
+}
+
+fn is_dark_theme(jar: &CookieJar) -> bool {
+    let darktheme = get_cookie_from_jar(&jar, "theme").unwrap_or(String::from("light"));
+    darktheme == "dark"
 }
 
 #[derive(Deserialize)]
@@ -154,28 +159,35 @@ async fn get_dir(
     jar: CookieJar,
     State(state): State<Arc<AppState>>,
 ) -> (CookieJar, Html<String>) {
-    let cookie_name = get_cookie_name(&dir);
+    let cookie_name = get_token_cookie_name(&dir);
     let new_jar = match &query.tok {
         Some(tok) => jar.add(Cookie::new(cookie_name.clone(), tok.clone())),
         None => jar,
     };
-    let tok = get_token_from_jar(&new_jar, &cookie_name);
-    (new_jar, utils::get_dir(&state.db_pool, dir, tok).await)
+    let tok = get_cookie_from_jar(&new_jar, &cookie_name);
+    let use_dark = is_dark_theme(&new_jar);
+    (new_jar, utils::get_dir(&state.db_pool, dir, tok, use_dark).await)
 }
 
 #[derive(Deserialize)]
-struct NoteRaw {
+struct GetNoteQuery {
     raw: Option<bool>,
+    theme: Option<String>,
 }
 
 async fn get_note(
-    Query(query): Query<NoteRaw>,
+    Query(query): Query<GetNoteQuery>,
     Path((dir, id)): Path<(String, String)>,
     jar: CookieJar,
     State(state): State<Arc<AppState>>,
 ) -> Response {
     let raw = query.raw.unwrap_or(false);
-    let cookie_name = get_cookie_name(&dir);
-    let tok = get_token_from_jar(&jar, &cookie_name);
-    utils::get_note(&state.db_pool, dir, id, raw, tok).await
+    let cookie_name = get_token_cookie_name(&dir);
+    let tok = get_cookie_from_jar(&jar, &cookie_name);
+    let new_jar = match &query.theme {
+        Some(theme) => jar.add(Cookie::new("theme", theme.clone())),
+        None => jar
+    };
+    let use_dark = is_dark_theme(&new_jar);
+    (new_jar, utils::get_note(&state.db_pool, dir, id, raw, tok, use_dark).await).into_response()
 }
