@@ -23,7 +23,7 @@ def help():
     print();
 
 def read_file(path):
-    file = open(path, "r")
+    file = open(path, "r", encoding='utf-8')
     content = file.read()
     file.close()
     return content
@@ -78,7 +78,6 @@ while True:
             remote_note = args[1]
             local_file = args[2]
             md_contents = read_file(local_file)
-            print('Posting to ' + NOTESERVER_URL + '/' + remote_note + ' |contents| ' + md_contents)
             resp = requests.post(NOTESERVER_URL + '/' + remote_note, md_contents, headers=auth_headers)
             print(resp.status_code)
         elif (args[0] == 'post-dir'):
