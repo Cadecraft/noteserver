@@ -20,11 +20,19 @@ pub fn is_valid_argon2(hashed: &str) -> bool {
 }
 
 pub fn is_authorized(password: &str) -> bool {
+    println!("Inputted pw: {:?}", password);
     let actual_hashed = env::var("ADMIN_PASSWORD").unwrap();
+    println!("Actual hash: {:?}", actual_hashed);
     match PasswordHash::new(&actual_hashed) {
-        Ok(parsed_hash) => Argon2::default()
+        Ok(parsed_hash) => {
+            println!("Parsed actual hash: {:?}", parsed_hash);
+            Argon2::default()
             .verify_password(password.as_bytes(), &parsed_hash)
-            .is_ok(),
-        Err(_) => false,
+            .is_ok()
+        },
+        Err(e) => {
+            println!("Error parsing actual hash: {:?}", e);
+            false
+        },
     }
 }
