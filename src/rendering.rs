@@ -1,106 +1,24 @@
-const STYLE_RULES: &str = r#"
-html {
-    --bg: #e3e3e5;
-    --text: #1e2128;
-    --bg-pre: #c9c9cc;
-    --text-pre: #3c3c42;
-    --border: #babdc1;
-    --link: #1165aa;
-    --link-hover: #3f87c1;
-}
+use crate::styling::STYLE_RULES;
 
-.dark {
-    --bg: #121216;
-    --text: #d9dadd;
-    --bg-pre: #26262d;
-    --text-pre: #9c9ea8;
-    --border: #3f4149;
-    --link: #74b7db;
-    --link-hover: #83c1e2;
-}
+fn front_matter(title: &str, descr: Option<&str>) -> String {
+    let descr_elem = match descr {
+        Some(d) => format!("<meta property=\"og:description\" content=\"{}\" />", d),
+        None => String::new(),
+    };
 
-body {
-    font-size: 16px;
-    background-color: var(--bg);
-    color: var(--text);
-    font-family: 'Lora', 'Arial';
-    display: flex;
-    justify-content: center;
-    padding: 4px 16px;
-}
-
-body > div {
-    width: 100%;
-    max-width: 820px;
-}
-
-h1 {
-    font-size: 26px;
-}
-
-h2 {
-    font-size: 22px;
-}
-
-h3 {
-    font-size: 18px;
-}
-
-h1, h2, h3 {
-    margin-top: 22px;
-    margin-bottom: 4px;
-}
-
-p {
-    margin-block: 12px;
-}
-
-a, a:visited {
-    color: var(--link);
-}
-
-a:hover {
-    color: var(--link-hover);
-    cursor: pointer;
-}
-
-pre, code {
-    background-color: var(--bg-pre);
-    color: var(--text-pre);
-}
-
-pre {
-    border-radius: 4px;
-    padding: 4px 8px;
-}
-
-code {
-    border-radius: 4px;
-    padding: 0px 2px;
-}
-
-.actions {
-    color: #797b7d;
-}
-
-hr {
-    border: solid 1px var(--border);
-    margin-top: 40px;
-}
-"#;
-
-fn front_matter(title: &str) -> String {
     format!(
         r#"
 <head>
 <title>{}</title>
+<meta property="og:title" content="{}" />
+{}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora">
 <style>
 {}
 </style>
 </head>
 "#,
-        title, STYLE_RULES
+        title, title, descr_elem, STYLE_RULES
     )
 }
 
@@ -118,17 +36,37 @@ pub fn error_page(error: &str) -> String {
 </body>
 </html>
 "#,
-        front_matter("Notes"),
+        front_matter("Notes", None),
         error
     )
 }
 
 const MISC_DIR_ID: &str = "misc";
 
+pub fn root() -> String {
+    format!(
+        r#"
+<!DOCTYPE html>
+<html>
+{}
+<body>
+    <div>
+        <h1>Notes</h1>
+        <p>
+            Self-hosted markdown notes. See the <a href="https://github.com/Cadecraft/noteserver">GitHub repository</a> for more information.
+        </p>
+    </div>
+</body>
+</html>
+"#,
+        front_matter("Notes", Some("Self-hosted markdown notes"))
+    )
+}
+
 pub fn directory(
     dir: &str,
     note_titles: &[String],
-    description: &Option<String>,
+    description: Option<&str>,
     darktheme: bool,
 ) -> String {
     let dir_descr_elem = match description {
@@ -154,7 +92,7 @@ pub fn directory(
 </html>
 "#,
             if darktheme { "dark" } else { "" },
-            front_matter(dir),
+            front_matter(dir, description),
             dir,
             dir_descr_elem
         );
@@ -182,11 +120,34 @@ pub fn directory(
 </html>
 "#,
         if darktheme { "dark" } else { "" },
-        front_matter(dir),
+        front_matter(dir, description),
         dir,
         dir_descr_elem,
         note_list
     )
+}
+
+fn to_valid_descr_char(c: char) -> char {
+    if c == '"' {
+        '\''
+    } else if c.is_whitespace() || c == '>' || c == '<' || c == '&' {
+        ' '
+    } else {
+        c
+    }
+}
+
+fn descr_from_contents(md_contents: &str) -> String {
+    let start = md_contents
+        .chars()
+        .take(60)
+        .map(to_valid_descr_char)
+        .collect::<String>();
+    if start.chars().count() < md_contents.chars().count() {
+        start + "..."
+    } else {
+        start
+    }
 }
 
 pub fn note(dir: &str, note: &str, md_contents: &str, darktheme: bool) -> String {
@@ -215,6 +176,8 @@ pub fn note(dir: &str, note: &str, md_contents: &str, darktheme: bool) -> String
 
     let actions_str = actions.iter().map(|o| o.to_string()).collect::<String>();
 
+    let note_descr = descr_from_contents(md_contents);
+
     format!(
         r#"
 <!DOCTYPE html>
@@ -230,7 +193,7 @@ pub fn note(dir: &str, note: &str, md_contents: &str, darktheme: bool) -> String
 </html>
 "#,
         if darktheme { "dark" } else { "" },
-        front_matter(&note_title),
+        front_matter(&note_title, Some(&note_descr)),
         md_as_html,
         actions_str
     )
