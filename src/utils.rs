@@ -37,17 +37,10 @@ pub fn is_dark_theme(jar: &CookieJar) -> bool {
 }
 
 pub fn valid_auth(headers: &HeaderMap) -> bool {
-    println!("Headers: {:?}", headers);
     match headers.get(header::AUTHORIZATION).cloned() {
-        Some(val) => {
-            println!("Val: {:?}", val);
-            match val.to_str() {
-                Ok(pw) => auth::is_authorized(pw),
-                Err(e) => {
-                    println!("Not ok {:?}", e);
-                    false
-                },
-            }
+        Some(val) => match val.to_str() {
+            Ok(pw) => auth::is_authorized(pw),
+            _ => false,
         },
         None => false,
     }
