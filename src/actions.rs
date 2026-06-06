@@ -197,8 +197,9 @@ pub async fn get_all_admin(pool: &sqlx::PgPool) -> String {
     format!("Directories:\n{}\n\nTokens:\n{}", dirs_disp, tokens_disp)
 }
 
-struct NoteMetadata {
-    id: String,
+pub struct NoteData {
+    pub id: String,
+    pub md_contents: String,
 }
 struct NoteContents {
     md_contents: String,
@@ -255,9 +256,9 @@ pub async fn get_dir(
     let (dir_metadata_res, note_query_res) = tokio::join!(
         get_dir_metadata(pool, &dir),
         sqlx::query_as!(
-            NoteMetadata,
+            NoteData,
             r#"
-            SELECT id
+            SELECT id, md_contents
             FROM note
             WHERE directory_id = $1;
         "#,
@@ -284,21 +285,15 @@ pub async fn get_dir(
         return Html(rendering::error_page(DIR_ERROR));
     }
 
-    let notes = match note_query_res {
+    let mut notes = match note_query_res {
         Ok(rows) => rows,
         Err(_) => return Html(rendering::error_page(DIR_ERROR)),
     };
 
-    let mut note_titles = notes.iter().map(|n| n.id.clone()).collect::<Vec<String>>();
-    note_titles.sort();
+    notes.sort_by_key(|f| f.id.clone());
 
     let description = target_dir.description.as_deref();
-    Html(rendering::directory(
-        &dir,
-        &note_titles,
-        description,
-        darktheme,
-    ))
+    Html(rendering::directory(&dir, &notes, description, darktheme))
 }
 
 pub async fn get_note(
